@@ -1,129 +1,130 @@
+// src/controllers/authController.js
 require('dotenv').config();
-const bcrypt=require('bcrypt');
-const jwt=require('jsonwebtoken');
-const UserModel=require('../models/userModel');
+const bcrypt    = require('bcrypt');
+const jwt       = require('jsonwebtoken');
+const UserModel = require('../models/userModel');
 
-const createAccessToken=(userId,email)=>{
-    return jwt.sign(
-        {userId,email,type:'access'},
-        process.env.JWT_ACCESS_SECRET,
-        {expiresIn:process.env.JWT_ACCESS_EXPIRES || '15m'}
+const createAccessToken = (userId, email) => {
+  return jwt.sign(
+    { userId, email, type: 'access' },
+    process.env.JWT_ACCESS_SECRET,
+    { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' }
+  );
+};
+
+const createRefreshToken = (userId) => {
+  return jwt.sign(
+    { userId, type: 'refresh' },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: process.env.JWT_REFRESH_EXPIRES || '7d' }
+  );
+};
+
+// POST /api/auth/register
+const register = async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        error:   'Validation Failed',
+        message: 'name, email, and password are required'
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        error:   'Validation Failed',
+        message: 'Password must be at least 8 characters'
+      });
+    }
+
+    const taken = await UserModel.emailExists(email.toLowerCase().trim());
+    if (taken) {
+      return res.status(409).json({
+        error:   'Conflict',
+        message: 'An account with this email already exists'
+      });
+    }
+
+    const rounds         = parseInt(process.env.BCRYPT_ROUNDS) || 12;
+    const hashedPassword = await bcrypt.hash(password, rounds);
+
+    const user = await UserModel.create(
+      name.trim(),
+      email.toLowerCase().trim(),
+      hashedPassword
     );
+
+    const accessToken  = createAccessToken(user.id, user.email);
+    const refreshToken = createRefreshToken(user.id);
+
+    await UserModel.saveRefreshToken(user.id, refreshToken);
+
+    res.status(201).json({
+      message: 'Account created successfully',
+      user: {
+        id:        user.id,
+        name:      user.name,
+        email:     user.email,
+        createdAt: user.created_at
+      },
+      tokens: { accessToken, refreshToken, accessExpiresIn: '15 minutes' }
+    });
+
+  } catch (err) {
+    console.error('Register error:', err.message);
+    res.status(500).json({ error: 'Registration failed' });
+  }
 };
 
-const createRefreshToken=(userId)=>{
-    return jwt.sign(
-        {userId,type:'refresh'},
-        process.env.JWT_REFRESH_SECRET,
-        {expiresIn:process.env.JWT_REFRESH_EXPIRES || '7d'}
-    );
+// POST /api/auth/login
+const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        error:   'Validation Failed',
+        message: 'email and password are required'
+      });
+    }
+
+    const user = await UserModel.findByEmail(email.toLowerCase().trim());
+
+    if (!user) {
+      return res.status(401).json({
+        error:   'Invalid Credentials',
+        message: 'Email or password is incorrect'
+      });
+    }
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(401).json({
+        error:   'Invalid Credentials',
+        message: 'Email or password is incorrect'
+      });
+    }
+
+    const accessToken  = createAccessToken(user.id, user.email);
+    const refreshToken = createRefreshToken(user.id);
+
+    await UserModel.saveRefreshToken(user.id, refreshToken);
+
+    res.status(200).json({
+      message: 'Login successful',
+      user:    { id: user.id, name: user.name, email: user.email },
+      tokens:  { accessToken, refreshToken, accessExpiresIn: '15 minutes' }
+    });
+
+  } catch (err) {
+    console.error('Login error:', err.message);
+    res.status(500).json({ error: 'Login failed' });
+  }
 };
 
-const register = async(req,res)=>{
-    try{
-        const{name,email,password}=req.body;
-
-        if(!name||!email||!password){
-            return res.status(400).json({
-                error:'Validation falied',
-                message:'name,email,and password are required'
-            });
-        }
-
-        if(password.length<8){
-            return res.status(400).json({
-                error:'Validation Failed',
-                message:'Password must be of atleast 8 characters'
-            });
-        }
-
-        const taken=await UserModel.emailExists(email.toLowerCase().trim());
-
-        if(!taken){
-            return res.status(409).json({
-                error:'Conflict',
-                message:'An account with this email already exists'
-            });
-        }
-
-        const rounds=parseInt(process.env.BCRYPT_ROUNDS)||12;
-        const hashedPassword=await bcrypt.hash(password,round);
-
-        const user=await UserModel.create(
-            name.trim(),
-            email.toLowerCase().trim(),
-            hashedPassword
-        );
-
-
-        const accessToken=createAccessToken(user.id,user.email);
-        const refreshToken=createRefreshToken(user.id);
-
-        await UserModel.saveRefreshToken(user.id,refreshToken);
-
-        res.status(201).json({
-            message:'Account created successfully',
-            user:{
-                id:user.id,
-                name:user.name,
-                email:user.email,
-                createdAt:user.created_at
-            },
-            tokens:{accessToken,refreshToken,accessExpiresIn:'15 minutes'}
-        });
-    }
-    catch(err){
-        console.error('Register error:',err.message);
-        res.status(500).json({error:'Registration failed'});
-    }
-};
-
-
-const login=async(req,res)=>{
-    try{
-        const{email,password}=req.body;
-        if(!email||!password){
-            return res.status(400).json({
-                error:'Validation Failed',
-                message:'email and password are require'
-            });
-        }
-
-        const user=await UserModel.findByEmail(email.toLowerCase().trim());
-
-        if(!user){
-            return res.status(400).json({
-                error:'Invalid credential',
-                message:'Email or password is incorrect'
-            });
-        }
-
-        const match=await bcrypt.compare(password,user.password);
-
-        if(!match){
-            return res.status(401).json({
-                error:'Invalid Credentials',
-                message:'Email or password is incorrect'
-            });
-        }
-
-        const accessToken=createAccessToken(user.id,user.email);
-        const refreshToken=createRefreshToken(user.id);
-
-        await UserModel.saveRefreshToken(user.id,refreshToken);
-
-        res.status(200).json({
-            message:'login successful',
-            user:{id:user.id,name:user.name,email:user.email},
-            tokens:{accessToken,refreshToken,accessExpiresIn:'15 minutes'}
-        });
-    }
-    catch(err){
-        console.error('login error:',err.message);
-        res.status(500).json({error:'Login Failed'});
-    }
-};
-
+// POST /api/auth/refresh
 const refresh = async (req, res) => {
   try {
     const { refreshToken: token } = req.body;
@@ -168,6 +169,7 @@ const refresh = async (req, res) => {
   }
 };
 
+// POST /api/auth/logout
 const logout = async (req, res) => {
   try {
     const { refreshToken: token } = req.body;
@@ -188,6 +190,7 @@ const logout = async (req, res) => {
   }
 };
 
+// GET /api/auth/me
 const getMe = async (req, res) => {
   try {
     const user = await UserModel.findById(req.user.userId);

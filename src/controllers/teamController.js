@@ -1,85 +1,105 @@
-const TeamModel= require('../models/teamModel');
-const UserModel=require('../models/userModel');
+// src/controllers/teamController.js
+//
+// ROLE-BASED ACCESS CONTROL explained:
+//
+// admin  → can do everything in the team
+// manager → can create/assign tasks, cannot delete team
+// member → can update task status, cannot manage team
+//
+// The getMembership check pattern:
+// 1. Verify user is a member of the team at all
+// 2. Check their role is sufficient for the action
+// This runs on every protected team operation
 
-const createTeam=async(req,res)=>{
-    try{
-        const{name,description}=req.body;
-        const userId=req.user.userId;
+const TeamModel = require('../models/teamModel');
+const UserModel = require('../models/userModel');
 
-        if(!name|| name.trim().length<2){
-            return res.status(400).json({
-                error:'Validation Failed',
-                message:'Team name must be at least 2 characters'
-            });
-        }
+// POST /api/teams
+// Any logged in user can create a team
+// Creator automatically becomes admin
+const createTeam = async (req, res) => {
+  try {
+    const { name, description } = req.body;
+    const userId = req.user.userId;
 
-        const team=await TeamModel.create(
-            name.trim(),
-            description?description.trim():null,
-            userId
-        );
-        
-        res.status(201).json({
-            message:'Team crreated Successfully',
-            team
-        });
-
-
+    if (!name || name.trim().length < 2) {
+      return res.status(400).json({
+        error:   'Validation Failed',
+        message: 'Team name must be at least 2 characters'
+      });
     }
 
-    catch(err){
-        console.error('Create team error:',err.message);
-        res.status(500).json({error:'Could not create team'});
-    }
+    const team = await TeamModel.create(
+      name.trim(),
+      description ? description.trim() : null,
+      userId
+    );
+
+    res.status(201).json({
+      message: 'Team created successfully',
+      team
+    });
+
+  } catch (err) {
+    console.error('Create team error:', err.message);
+    res.status(500).json({ error: 'Could not create team' });
+  }
 };
 
-const getMyTeams=async(req,res)=>{
-    try{
-        const team=await TeamModel.getByUserId(req.user.userId);
+// GET /api/teams
+// Get all teams the logged in user belongs to
+const getMyTeams = async (req, res) => {
+  try {
+    const teams = await TeamModel.getByUserId(req.user.userId);
 
-        res.status(200).json({
-            count:getMyTeams.length,
-            teams
-        });
-    }
-    catch(err){
-        console.error('Get team error:',err.message);
-        res.status(500).json({error:'Could not fetch teams'});
-    }
+    res.status(200).json({
+      count: teams.length,
+      teams
+    });
+
+  } catch (err) {
+    console.error('Get teams error:', err.message);
+    res.status(500).json({ error: 'Could not fetch teams' });
+  }
 };
 
-const getTeam=async(req,res)=>{
-    try{
-        const teamId=parseInt(req.params.teamId);
-        const userId=req.user.userId;
+// GET /api/teams/:teamId
+// Get full team details including member list
+// User must be a member to see this
+const getTeam = async (req, res) => {
+  try {
+    const teamId = parseInt(req.params.teamId);
+    const userId = req.user.userId;
 
-        if(isNaN(teamId)){
-            return res.status(400).json({error:'Team ID must be a number'});
-        }
-
-        const membership=await TeamModel.getMembership(teamId,userId);
-        if(!membership){
-            return res.status(403).json({
-                error:'Forbidden',
-                message:'You are not a member of this team'
-            });
-        }
-
-        const team=await TeamModel.getById(teamId);
-
-        if(!team){
-            return res.status(404).json({error:'Team not found'});
-        }
-
-        res.status(200).json({team});
+    if (isNaN(teamId)) {
+      return res.status(400).json({ error: 'Team ID must be a number' });
     }
 
-    catch(err){
-        console.error('get team error:',err.message);
-        res.status(500).json({error:'Could not fetch team'});
+    // Check user is a member
+    const membership = await TeamModel.getMembership(teamId, userId);
+    if (!membership) {
+      return res.status(403).json({
+        error:   'Forbidden',
+        message: 'You are not a member of this team'
+      });
     }
+
+    const team = await TeamModel.getById(teamId);
+    if (!team) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+
+    res.status(200).json({ team });
+
+  } catch (err) {
+    console.error('Get team error:', err.message);
+    res.status(500).json({ error: 'Could not fetch team' });
+  }
 };
 
+// POST /api/teams/:teamId/members
+// Invite a user to the team by their email
+// Only admin can invite members
 const inviteMember = async (req, res) => {
   try {
     const teamId = parseInt(req.params.teamId);

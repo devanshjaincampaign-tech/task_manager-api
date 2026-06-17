@@ -1,35 +1,51 @@
-const pool=require('../config/db');
+// src/models/teamModel.js
+// All database queries for teams and team membership
+//
+// Key concept: team_members is a junction table
+// It connects users and teams in a many-to-many relationship
+// One user can be in many teams
+// One team can have many users
+// The role column tells us what each user can do in that team
 
-const create= async (name,description,ownerId)=>{
-    const client=await pool.connect();
-    try{
-        await client.query('BEGIN');
-        const teamResult=await client.query(
-            `INSERT INTO teams(name,description,owner_id)
-            VALUES($1,$2,$3)
-            RETURNING *`,
-            [name,description,ownerId]
-        );
-        const team=teamResult.rows[0];
+const pool = require('../config/db');
 
-        await client.query(
-            `INSERT INTO team_members (team_id, user_id, role)
-            VALUES ($1, $2, 'admin')`,
-            [team.id, ownerId]
-        );
+// Create a new team
+// After creating, automatically add the creator as admin
+const create = async (name, description, ownerId) => {
+  // Use a transaction — both inserts must succeed or neither does
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-        await client.query('COMMIT');
-        return team;
-    }
-    catch(err){
-        await client.query('ROLLBACK');
-        throw err;
-    }
-    finally{
-        client.release();
-    }
+    // Create the team
+    const teamResult = await client.query(
+      `INSERT INTO teams (name, description, owner_id)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [name, description, ownerId]
+    );
+    const team = teamResult.rows[0];
+
+    // Add creator as admin member automatically
+    await client.query(
+      `INSERT INTO team_members (team_id, user_id, role)
+       VALUES ($1, $2, 'admin')`,
+      [team.id, ownerId]
+    );
+
+    await client.query('COMMIT');
+    return team;
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
+// Get all teams a user belongs to
+// JOIN shows team info + user's role in each team
 const getByUserId = async (userId) => {
   const result = await pool.query(
     `SELECT
@@ -50,6 +66,7 @@ const getByUserId = async (userId) => {
   return result.rows;
 };
 
+// Get one team by ID with full member list
 const getById = async (teamId) => {
   const result = await pool.query(
     `SELECT
@@ -77,6 +94,8 @@ const getById = async (teamId) => {
   return result.rows[0] || null;
 };
 
+// Check if a user is a member of a team and what their role is
+// Returns null if user is not a member
 const getMembership = async (teamId, userId) => {
   const result = await pool.query(
     `SELECT * FROM team_members
@@ -86,6 +105,7 @@ const getMembership = async (teamId, userId) => {
   return result.rows[0] || null;
 };
 
+// Add a user to a team with a specified role
 const addMember = async (teamId, userId, role = 'member') => {
   const result = await pool.query(
     `INSERT INTO team_members (team_id, user_id, role)
@@ -97,6 +117,7 @@ const addMember = async (teamId, userId, role = 'member') => {
   return result.rows[0] || null;
 };
 
+// Remove a user from a team
 const removeMember = async (teamId, userId) => {
   const result = await pool.query(
     `DELETE FROM team_members
@@ -107,6 +128,7 @@ const removeMember = async (teamId, userId) => {
   return result.rows[0] || null;
 };
 
+// Update a member's role
 const updateMemberRole = async (teamId, userId, role) => {
   const result = await pool.query(
     `UPDATE team_members
@@ -118,6 +140,7 @@ const updateMemberRole = async (teamId, userId, role) => {
   return result.rows[0] || null;
 };
 
+// Delete a team entirely
 const deleteTeam = async (teamId) => {
   const result = await pool.query(
     'DELETE FROM teams WHERE id = $1 RETURNING *',
@@ -126,4 +149,7 @@ const deleteTeam = async (teamId) => {
   return result.rows[0] || null;
 };
 
-module.exports={create,getById,getByUserId,getMembership,addMember,removeMember,updateMemberRole,deleteTeam};
+module.exports = {
+  create, getByUserId, getById, getMembership,
+  addMember, removeMember, updateMemberRole, deleteTeam
+};
