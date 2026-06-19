@@ -4,7 +4,8 @@ A production-ready task management system built with Node.js, Express, and Postg
 
 ## Live Demo
 
-Base URL: `https://your-deployed-url.railway.app`
+Base URL: `https://task-manager-api-175t.onrender.com`
+
 
 > Test the API directly using the endpoints documented below.
 
@@ -104,170 +105,7 @@ task-manager-api/
 - A Gmail account with an App Password for email notifications
 - npm
 
-### Installation
 
-**Step 1 — Clone the repository**
-
-```bash
-git clone https://github.com/yourusername/task-manager-api.git
-cd task-manager-api
-```
-
-**Step 2 — Install dependencies**
-
-```bash
-npm install
-```
-
-**Step 3 — Set up environment variables**
-
-```bash
-cp .env.example .env
-```
-
-Open `.env` and fill in your values:
-
-```env
-PORT=3000
-NODE_ENV=development
-
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=task_manager
-DB_USER=postgres
-DB_PASSWORD=your_postgres_password
-
-JWT_ACCESS_SECRET=your_long_random_access_secret
-JWT_REFRESH_SECRET=your_long_random_refresh_secret
-JWT_ACCESS_EXPIRES=15m
-JWT_REFRESH_EXPIRES=7d
-
-BCRYPT_ROUNDS=12
-
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=your_gmail_address@gmail.com
-EMAIL_PASS=your_gmail_app_password
-EMAIL_FROM=Task Manager <your_gmail_address@gmail.com>
-
-MAX_FILE_SIZE=5242880
-UPLOAD_PATH=uploads/
-```
-
-> Email notifications require a Gmail App Password, not your regular password. Generate one at myaccount.google.com under Security → 2-Step Verification → App passwords.
-
-**Step 4 — Set up the database**
-
-Connect to PostgreSQL and run:
-
-```sql
-CREATE DATABASE task_manager;
-\c task_manager
-
-CREATE TABLE users (
-  id            SERIAL PRIMARY KEY,
-  name          VARCHAR(100) NOT NULL,
-  email         VARCHAR(100) UNIQUE NOT NULL,
-  password      VARCHAR(255) NOT NULL,
-  created_at    TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE teams (
-  id            SERIAL PRIMARY KEY,
-  name          VARCHAR(100) NOT NULL,
-  description   TEXT,
-  owner_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  created_at    TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE team_members (
-  id          SERIAL PRIMARY KEY,
-  team_id     INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  role        VARCHAR(20) NOT NULL DEFAULT 'member',
-  joined_at   TIMESTAMP DEFAULT NOW(),
-  UNIQUE(team_id, user_id)
-);
-
-CREATE TABLE tasks (
-  id            SERIAL PRIMARY KEY,
-  title         VARCHAR(200) NOT NULL,
-  description   TEXT,
-  status        VARCHAR(20) NOT NULL DEFAULT 'todo',
-  priority      VARCHAR(20) NOT NULL DEFAULT 'medium',
-  due_date      TIMESTAMP,
-  team_id       INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-  created_by    INTEGER NOT NULL REFERENCES users(id),
-  assigned_to   INTEGER REFERENCES users(id),
-  created_at    TIMESTAMP DEFAULT NOW(),
-  updated_at    TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE task_attachments (
-  id            SERIAL PRIMARY KEY,
-  task_id       INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-  filename      VARCHAR(255) NOT NULL,
-  original_name VARCHAR(255) NOT NULL,
-  file_size     INTEGER NOT NULL,
-  mime_type     VARCHAR(100) NOT NULL,
-  uploaded_by   INTEGER NOT NULL REFERENCES users(id),
-  created_at    TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE refresh_tokens (
-  id          SERIAL PRIMARY KEY,
-  user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  token       TEXT NOT NULL,
-  expires_at  TIMESTAMP NOT NULL,
-  created_at  TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_tasks_team_id     ON tasks(team_id);
-CREATE INDEX idx_tasks_assigned_to ON tasks(assigned_to);
-CREATE INDEX idx_tasks_status      ON tasks(status);
-CREATE INDEX idx_team_members_team ON team_members(team_id);
-CREATE INDEX idx_team_members_user ON team_members(user_id);
-```
-
-**Step 5 — Start the server**
-
-```bash
-npm run dev
-```
-
-Server runs at `http://localhost:3000`
-
----
-
-### Docker Setup (Alternative)
-
-Run the entire stack with one command:
-
-```bash
-docker compose up
-```
-
-This starts the API server and PostgreSQL together.
-
----
-
-## API Documentation
-
-### Authentication Endpoints
-
----
-
-#### Register
-
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js v18 or higher
-- PostgreSQL 14 or higher
-- A Gmail account with an App Password for email notifications
-- npm
 
 ### Installation
 
@@ -877,7 +715,7 @@ Team creation uses a database transaction to ensure the team record and the crea
 | EMAIL_PORT | SMTP port | 587 |
 | EMAIL_USER | Sender email address | yourgmail@gmail.com |
 | EMAIL_PASS | Gmail App Password | 16-character app password |
-| EMAIL_FROM | Display name and email | Task Manager <you@gmail.com> |
+| EMAIL_FROM | Display name and email | Task Manager <devanshjaincampaign@gmail.com> |
 | MAX_FILE_SIZE | Max upload size in bytes | 5242880 |
 | UPLOAD_PATH | File storage directory | uploads/ |
 
