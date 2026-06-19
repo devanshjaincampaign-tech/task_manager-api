@@ -1,0 +1,45 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    container_name: task-manager-app
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=task_manager
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres123
+      - JWT_ACCESS_SECRET=local_dev_access_secret
+      - JWT_REFRESH_SECRET=local_dev_refresh_secret
+      - JWT_ACCESS_EXPIRES=15m
+      - JWT_REFRESH_EXPIRES=7d
+      - BCRYPT_ROUNDS=12
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: task-manager-postgres
+    environment:
+      POSTGRES_DB: task_manager
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
